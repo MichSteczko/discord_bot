@@ -8,6 +8,7 @@ import random
 import asyncio
 import time
 from db_conn import UsersDb as db
+from discord.ext.commands import CommandNotFound
 # dopisanie funkcji z asyncio do sprawdzania userow
 
 env_path = Path('.') / '.env'
@@ -28,6 +29,12 @@ async def on_ready():
     print(
         f'{bot.user.name} {guild} has connected to discord!'
     )
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, CommandNotFound):
+        await ctx.send("Invalid command!")
 
 
 @bot.command(pass_context=True, name='show')
@@ -54,26 +61,53 @@ contest_start = False
 
 
 @contest.command(pass_context=True, name='start')
-async def start(ctx, name: str, *options):
+async def start(ctx, *options):
     global contest_start
     if contest_start:
         await ctx.send("Contest is currently running!")
     else:
-        global embed
-        embed = discord.Embed(title=name, color=0xff0000, inline=False)
-        for option in options:
-            embed.add_field(name=option, value=0, inline=False)
+        name = ''
+        try:
+            name = options[0]
+        except IndexError:
+            await ctx.send("Please name your contest!")
+        else:
+            global creator
+            creator = ctx.author
 
-        global user_vote
-        user_vote = []
-        await ctx.send(content=f'Contest {name} has been started!', embed=embed)
-        contest_start = True
+            global embed
+
+            new_name = ''
+
+            if name.find("_"):
+                new_name = name.replace("_", " ")
+                embed = discord.Embed(
+                    title=new_name, color=0xff0000, inline=False)
+            else:
+                embed = discord.Embed(
+                    title=name, color=0xff0000, inline=False)
+
+            for option in range(1, len(options)):
+                new_option = ''
+                if options[option].find("_"):
+                    new_option = options[option].replace("_", " ")
+                    embed.add_field(name=new_option, value=0, inline=False)
+                else:
+                    embed.add_field(
+                        name=options[option], value=0, inline=False)
+
+            global user_vote
+            user_vote = []
+            await ctx.send(content=f'Contest {embed.title} has been started!', embed=embed)
+            contest_start = True
 
 
 @contest.command(pass_context=True, name='add')
 async def add(ctx, option: str):
+    if option.find("_"):
+        option = option.replace("_", " ")
     embed.add_field(name=option, value=0, inline=False)
-    await ctx.send('New option has been added to contest!')
+    await ctx.send('New option has been added to contest!', embed=embed)
 
 
 @contest.command(pass_context=True, name='vote')
@@ -91,13 +125,14 @@ async def vote(ctx, name: str):
             if not 'fields' in dicted.keys():
                 await ctx.send('This contest doesn\'t have any option!')
             else:
-
+                if name.find("_"):
+                    name = name.replace("_", " ")
                 for n in dicted['fields']:
-                    if n['name'] == name:
+                    if n['name'].lower() == name.lower():
                         value = int(n['value'])
                         value += 1
                         embed.set_field_at(
-                            index=index, name=name, value=value)
+                            index=index, name=n['name'], value=value)
                     index += 1
 
                 await ctx.send(embed=embed)
@@ -107,10 +142,14 @@ async def vote(ctx, name: str):
 async def stop(ctx):
     global contest_start
     if contest_start:
-        await ctx.send(content='Contest has been ended', embed=embed)
-        del globals()['embed']
-        del globals()['user_vote']
-        contest_start = False
+        if ctx.author == creator:
+            await ctx.send(content='Contest has been ended', embed=embed)
+            del globals()['embed']
+            del globals()['user_vote']
+            del globals()['creator']
+            contest_start = False
+        else:
+            await ctx.send("Only creator can stop the contest!")
     else:
         await ctx.send('Contest is already over!')
 
