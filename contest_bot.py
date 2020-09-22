@@ -127,15 +127,18 @@ async def vote(ctx, name: str):
             else:
                 if name.find("_"):
                     name = name.replace("_", " ")
-                for n in dicted['fields']:
-                    if n['name'].lower() == name.lower():
-                        value = int(n['value'])
-                        value += 1
-                        embed.set_field_at(
-                            index=index, name=n['name'], value=value)
-                    index += 1
+                if not name.lower() in dicted['fields'].lower():
+                    await ctx.send("Option doesn/'t exist!")
+                else:
+                    for n in dicted['fields']:
+                        if n['name'].lower() == name.lower():
+                            value = int(n['value'])
+                            value += 1
+                            embed.set_field_at(
+                                index=index, name=n['name'], value=value)
+                        index += 1
 
-                await ctx.send(embed=embed)
+                    await ctx.send(embed=embed)
 
 
 @contest.command(pass_context=True, name='stop')
